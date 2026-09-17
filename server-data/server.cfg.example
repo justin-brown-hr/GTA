@@ -1,0 +1,75 @@
+# Heartless City RP — copy to server.cfg and fill secrets
+# Do not commit real license keys or DB passwords.
+
+endpoint_add_tcp "0.0.0.0:30120"
+endpoint_add_udp "0.0.0.0:30120"
+
+sv_hostname "Heartless City RP | Serious Cali RP"
+sets sv_projectName "Heartless City RP"
+sets sv_projectDesc "Serious California roleplay — jobs, businesses, heists, exclusive cars."
+sets tags "roleplay, serious rp, qbcore, cali, heartless"
+sets locale "en-US"
+
+# Get from https://keymaster.fivem.net
+sv_licenseKey "CHANGE_ME_LICENSE_KEY"
+sv_maxclients 48
+
+# Steam / Discord identifiers recommended for staff
+set steam_webApiKey "CHANGE_ME"
+
+## MySQL (oxmysql)
+set mysql_connection_string "mysql://root:password@127.0.0.1/heartless_city?charset=utf8mb4"
+
+## Onesync
+set onesync on
+set onesync_enabled true
+set onesync_population true
+
+## Voice
+setr voice_useNativeAudio true
+setr voice_useSendingRangeOnly true
+
+## Tebex (exclusive dealership)
+# set sv_tebexSecret "CHANGE_ME"
+
+## QB / ox
+setr qb_locale "en"
+setr ox:locale "en"
+
+# Ensure order
+ensure oxmysql
+ensure ox_lib
+ensure qb-core
+ensure ox_inventory
+ensure ox_target
+ensure pma-voice
+
+# QB gameplay (add as you install)
+# ensure qb-multicharacter
+# ensure qb-spawn
+# ensure qb-apartments
+# ensure qb-banking
+# ensure qb-management
+# ensure qb-vehiclekeys
+# ensure qb-garages
+# ensure qb-shops
+# ensure qb-weapons
+# ensure qb-policejob
+# ensure qb-ambulancejob
+
+# Heartless City custom
+ensure hc-core
+ensure hc-jobs
+ensure hc-business
+ensure hc-drugs
+ensure hc-scam
+ensure hc-heists
+ensure hc-dealership
+ensure hc-clothing
+ensure hc-weapons
+ensure hc-zombie
+
+## Permissions example
+add_ace group.admin command allow
+add_ace group.admin command.quit deny
+add_principal identifier.license:YOUR_LICENSE group.admin

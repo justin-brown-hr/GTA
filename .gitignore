@@ -1,0 +1,21 @@
+# Secrets / local runtime
+server-data/server.cfg
+**/credentials*
+secrets/
+**/.env
+*.log
+
+# FXServer binaries (install separately)
+alpine/
+citizen/
+FXServer*
+run.sh
+run.cmd
+
+# Large dependency folders if cloned locally (optional ignore)
+# server-data/resources/[qb]/
+# server-data/resources/[standalone]/
+# server-data/resources/[cfx]/
+
+.DS_Store
+node_modules/
