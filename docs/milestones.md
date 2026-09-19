@@ -39,5 +39,5 @@ Includes:
 
 | Milestone | Status |
 |-----------|--------|
-| M1 | **In progress** — jobs + businesses playable; needs QB stack on staging for client demo |
-| M2 | Scaffolded — deepen after M1 acceptance |
+| M1 | Jobs + businesses in code; still needs QB stack on staging for demo |
+| M2 | **On VPS for client demo** — loops + stream packs live; run `docs/m2-acceptance.md` in-game. `5s_lib` needs Keymaster entitlement on live cfxk. |

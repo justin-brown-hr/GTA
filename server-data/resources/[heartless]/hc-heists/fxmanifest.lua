@@ -25,5 +25,7 @@ dependencies {
     'qb-core',
     'oxmysql',
     'ox_lib',
+    'ox_inventory',
+    'ox_target',
     'hc-core',
 }

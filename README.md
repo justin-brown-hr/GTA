@@ -40,9 +40,9 @@ All Heartless features live under `resources/[heartless]/`:
 - `hc-heists` — heists
 - `hc-scam` — scam equipment
 - `hc-dealership` — public + exclusive Tebex cars
-- `hc-clothing` — fashion hooks
-- `hc-weapons` — realistic / custom weapon shops
-- `hc-zombie` — survival side zone
+- `hc-clothing` — fashion shops (Vinewood, Beach, La Galeria)
+- `hc-weapons` — realistic + paid custom weapon shops
+- `hc-zombie` — Deadzone enter / loot / extract
 
 ## Docs
 
@@ -51,4 +51,6 @@ All Heartless features live under `resources/[heartless]/`:
 - [Architecture](docs/architecture.md)
 - [Delivery roadmap](docs/roadmap.md)
 - [Dependencies](docs/dependencies.md)
+- [Security hardening + regression tests](docs/security-hardening.md)
+- [Tebex → exclusive dealership setup](docs/tebex-setup.md)
 - [Client proposal template](docs/client-proposal.md)

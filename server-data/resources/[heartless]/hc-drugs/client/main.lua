@@ -1,4 +1,16 @@
-local function addZone(name, coords, label, event, drugId)
+local function doProgress(label)
+    return lib.progressCircle({
+        duration = 6500,
+        label = label,
+        position = 'bottom',
+        useWhileDead = false,
+        canCancel = true,
+        disable = { move = true, car = true, combat = true },
+        anim = { dict = 'amb@world_human_gardener_plant@male@base', clip = 'base' },
+    })
+end
+
+local function addZone(name, coords, label, event, drugId, progressLabel)
     exports.ox_target:addBoxZone({
         coords = coords,
         size = vec3(2.0, 2.0, 2.5),
@@ -9,17 +21,27 @@ local function addZone(name, coords, label, event, drugId)
                 icon = 'fa-solid fa-flask',
                 label = label,
                 onSelect = function()
-                    TriggerServerEvent(event, drugId)
+                    if doProgress(progressLabel) then
+                        TriggerServerEvent(event, drugId)
+                    end
                 end,
             },
         },
     })
+    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
+    SetBlipSprite(blip, 496)
+    SetBlipScale(blip, 0.55)
+    SetBlipColour(blip, 25)
+    SetBlipAsShortRange(blip, false)
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName(label)
+    EndTextCommandSetBlipName(blip)
 end
 
 CreateThread(function()
     for _, drug in ipairs(Config.Drugs) do
-        addZone('hc_gather_' .. drug.id, drug.gatherCoords, 'Gather ' .. drug.label, 'hc-drugs:server:gather', drug.id)
-        addZone('hc_process_' .. drug.id, drug.processCoords, 'Process ' .. drug.label, 'hc-drugs:server:process', drug.id)
+        addZone('hc_gather_' .. drug.id, drug.gatherCoords, 'Gather ' .. drug.label, 'hc-drugs:server:gather', drug.id, 'Gathering...')
+        addZone('hc_process_' .. drug.id, drug.processCoords, 'Process ' .. drug.label, 'hc-drugs:server:process', drug.id, 'Processing...')
     end
 
     local pedHash = Config.SellPed.model
@@ -42,7 +64,15 @@ CreateThread(function()
                         title = drug.label,
                         description = ('Sell %s'):format(drug.productItem),
                         onSelect = function()
-                            TriggerServerEvent('hc-drugs:server:sell', drug.id)
+                            if lib.progressCircle({
+                                duration = 4000,
+                                label = 'Making a deal...',
+                                position = 'bottom',
+                                canCancel = true,
+                                disable = { move = true, combat = true },
+                            }) then
+                                TriggerServerEvent('hc-drugs:server:sell', drug.id)
+                            end
                         end,
                     }
                 end

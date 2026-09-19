@@ -18,7 +18,9 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    'server/vehicles.lua',
     'server/main.lua',
+    'server/tebex.lua',
 }
 
 dependencies {

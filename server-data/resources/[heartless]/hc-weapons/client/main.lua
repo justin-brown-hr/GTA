@@ -1,4 +1,13 @@
 CreateThread(function()
+    local blip = AddBlipForCoord(Config.Shop.coords.x, Config.Shop.coords.y, Config.Shop.coords.z)
+    SetBlipSprite(blip, 110)
+    SetBlipScale(blip, 0.7)
+    SetBlipColour(blip, 1)
+    SetBlipAsShortRange(blip, false)
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName(Config.Shop.label)
+    EndTextCommandSetBlipName(blip)
+
     exports.ox_target:addBoxZone({
         coords = Config.Shop.coords,
         size = vec3(2.0, 2.0, 2.5),

@@ -1,4 +1,18 @@
+local function addDealerBlip(coords, sprite, colour, name)
+    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
+    SetBlipSprite(blip, sprite)
+    SetBlipScale(blip, 0.75)
+    SetBlipColour(blip, colour)
+    SetBlipAsShortRange(blip, false)
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName(name)
+    EndTextCommandSetBlipName(blip)
+end
+
 CreateThread(function()
+    addDealerBlip(Config.PublicLot.coords, 326, 3, Config.PublicLot.label)
+    addDealerBlip(Config.ExclusiveLot.coords, 326, 5, Config.ExclusiveLot.label)
+
     -- Public lot
     exports.ox_target:addBoxZone({
         coords = Config.PublicLot.coords,
@@ -42,17 +56,31 @@ CreateThread(function()
                         {
                             title = 'How to buy',
                             description = Config.ExclusiveLot.buyHint,
+                            icon = 'fa-solid fa-circle-info',
                         },
                     }
+                    if Config.ExclusiveLot.storeUrl then
+                        options[#options + 1] = {
+                            title = 'Store link',
+                            description = Config.ExclusiveLot.storeUrl,
+                            icon = 'fa-solid fa-cart-shopping',
+                        }
+                    end
                     for _, v in ipairs(Config.ExclusiveLot.vehicles) do
                         options[#options + 1] = {
                             title = v.label,
-                            description = 'Exclusive — real money only',
+                            description = v.priceUsd
+                                and ('$%s USD — real money only'):format(v.priceUsd)
+                                or 'Exclusive — real money only',
+                            icon = 'fa-solid fa-gem',
                             onSelect = function()
                                 lib.notify({
-                                    title = 'Exclusive',
-                                    description = 'Buy this package on Tebex. It will be granted automatically.',
+                                    title = v.label,
+                                    description = ('Buy this on the Heartless store. It is delivered to your garage automatically — you do not need to be online.%s'):format(
+                                        Config.ExclusiveLot.storeUrl and ('\n' .. Config.ExclusiveLot.storeUrl) or ''
+                                    ),
                                     type = 'inform',
+                                    duration = 12000,
                                 })
                             end,
                         }
@@ -65,12 +93,13 @@ CreateThread(function()
     })
 end)
 
-RegisterNetEvent('hc-dealership:client:spawnPurchased', function(model, plate)
-    local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped)
+RegisterNetEvent('hc-dealership:client:spawnPurchased', function(model, plate, exclusive)
+    local spawn = exclusive and Config.ExclusiveSpawn or Config.PublicSpawn
     lib.requestModel(model)
-    local veh = CreateVehicle(joaat(model), coords.x + 3.0, coords.y, coords.z, GetEntityHeading(ped), true, false)
+    local veh = CreateVehicle(joaat(model), spawn.x, spawn.y, spawn.z, spawn.w, true, false)
     SetVehicleNumberPlateText(veh, plate)
-    TaskWarpPedIntoVehicle(ped, veh, -1)
+    SetVehicleOnGroundProperly(veh)
+    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
     SetModelAsNoLongerNeeded(model)
+    TriggerEvent('vehiclekeys:client:SetOwner', plate)
 end)

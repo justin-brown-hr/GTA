@@ -25,12 +25,36 @@ set onesync on
 set onesync_enabled true
 set onesync_population true
 
+## Baseline hardening
+# No script hook / trainers on a serious RP city.
+sv_scriptHookAllowed 0
+
+# Entity lockdown. 'relaxed' blocks the worst client-side entity spam while
+# still allowing our client-side spawns (job vehicles, dealership deliveries,
+# Deadzone peds) to work.
+#
+# Do NOT set this to "strict" until vehicle and ped creation has been moved to
+# the server natives — strict blocks ALL client-created entities and will break
+# hc-jobs, hc-dealership and hc-zombie on the spot. Test on staging first.
+sv_entityLockdown "relaxed"
+
+# Stop clients from taking control of entities they do not own (vehicle theft
+# by menu, yeeting other players' cars).
+sv_filterRequestControl 4
+
+# Kick clients whose net timing does not add up (basic speedhack signal).
+sv_authMaxVariance 1
+sv_authMinTrust 5
+
 ## Voice
 setr voice_useNativeAudio true
 setr voice_useSendingRangeOnly true
 
 ## Tebex (exclusive dealership)
+# Secret from Tebex → Game Server → server key. Required for the tebex resource
+# to run store commands on this server. See docs/tebex-setup.md.
 # set sv_tebexSecret "CHANGE_ME"
+# ensure tebex
 
 ## QB / ox
 setr qb_locale "en"
@@ -43,6 +67,43 @@ ensure qb-core
 ensure ox_inventory
 ensure ox_target
 ensure pma-voice
+
+setr inventory:framework "qb"
+
+# Client MLOs / cars / guns (after scripts/unpack-client-files.sh → [stream])
+# Prefer named ensures over ensure [assets] (flat packs break join / awaiting scripts).
+# ensure 5s_lib   -- requires Keymaster entitlement on the live cfxk
+ensure anarchy_Island
+ensure anarchy_IslandMH
+ensure anarchy_Cardealer
+ensure anarchy_LaGaleriaMall
+ensure anarchy_LSCGarage
+ensure anarchy_limeys
+ensure anarchy_GalaxyClub
+ensure anarchy_MooreClub
+ensure anarchy_TrapHouse
+ensure anarchy_underground
+ensure anarchy_MirrorParkHood
+ensure anarchy_BeachHood
+# Exclusive vehicles (FiveM-ready packs — confirmed spawn names)
+ensure hc_veh_cybertruck      # CyberTruckV
+ensure hc_veh_cometmans       # cometmans
+ensure hc_veh_sddriftvet      # sddriftvet
+ensure hc_veh_s1000rr23       # ip_m1000rr_23
+
+# Addon weapons (each adds its own WEAPON_ name)
+ensure hc_wep_doma            # WEAPON_DOMA
+ensure hc_wep_revenant15      # WEAPON_REVENANT15  (also reskins the vanilla carbine)
+ensure hc_wep_ghost           # WEAPON_GHOST       (also reskins the vanilla pistol)
+ensure hc_wep_pringle         # WEAPON_PRINGLE
+ensure hc_wep_mitsuri         # WEAPON_MITSURISWITCHDRUM
+ensure hc_wep_tanjiro         # WEAPON_TANJIROSWITCHDRUM
+
+# Weapon SKIN packs — these re-texture a vanilla weapon instead of adding one.
+# Only ONE pack can own a given vanilla weapon: four packs want APPISTOL and
+# four want CARBINERIFLE. Pick one per slot; the rest do nothing.
+# Full collision table: docs/client-assets.md section C
+ensure hc_wep_fiveseven       # reskins WEAPON_PISTOL
 
 # QB gameplay (add as you install)
 # ensure qb-multicharacter
@@ -70,6 +131,20 @@ ensure hc-weapons
 ensure hc-zombie
 
 ## Permissions example
+# NOTE: 'command allow' is every command on the server. Fine for the owner,
+# too broad for moderators — give them a narrower group when staff grows.
 add_ace group.admin command allow
 add_ace group.admin command.quit deny
 add_principal identifier.license:YOUR_LICENSE group.admin
+
+# hc_tebex_grant is console/RCON only (it checks source == 0), so it cannot be
+# run by an in-game admin even with the ace above. Tebex calls it as a server
+# command; anyone with RCON can grant exclusive cars, so keep RCON off unless
+# you are using it and never paste rcon_password into Discord.
+
+# Exclusive cars are real money, so in-game granting is its own permission
+# rather than part of generic admin. Give it only to people you would trust
+# with the store itself.
+add_ace group.admin hc.grant deny
+# add_principal identifier.license:OWNER_LICENSE group.hcgrant
+# add_ace group.hcgrant hc.grant allow
