@@ -1,5 +1,34 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
+--- Server-side distance check — the desk and the stash are physical places.
+local function near(src, coords, dist)
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 or not coords then return false end
+    return #(GetEntityCoords(ped) - coords) <= (dist or Config.InteractDistance)
+end
+
+local function rateLimit(src, key, ms)
+    return exports['hc-core']:RateLimit(src, key, ms)
+end
+
+local function reject(src, reason, msg)
+    exports['hc-core']:Flag(src, 'business:' .. reason)
+    if msg then exports['hc-core']:Notify(src, msg, 'error') end
+end
+
+--- Money coming from a client is a suggestion. Force it to a whole, positive,
+--- sane number before it touches a balance.
+---@return number|nil
+local function sanitizeAmount(src, raw)
+    local amount = math.floor(tonumber(raw) or 0)
+    if amount <= 0 then return nil end
+    if amount > Config.MaxTransaction then
+        reject(src, 'amount-toolarge', ('Maximum per transaction is $%s.'):format(Config.MaxTransaction))
+        return nil
+    end
+    return amount
+end
+
 local function getDef(key)
     for _, b in ipairs(Config.Businesses) do
         if b.key == key then return b end
@@ -30,10 +59,15 @@ end
 
 RegisterNetEvent('hc-business:server:openDesk', function(key)
     local src = source
+    if not rateLimit(src, 'business:desk', 500) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     local def = getDef(key)
     if not def then return end
+    if not near(src, def.coords) then
+        reject(src, 'desk-distance', 'You are not at that business.')
+        return
+    end
 
     local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
     local owner = row and row.owner_citizenid or nil
@@ -54,12 +88,17 @@ end)
 
 RegisterNetEvent('hc-business:server:buy', function(key)
     local src = source
+    if not rateLimit(src, 'business:buy', 3000) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     local def = getDef(key)
     if not def then return end
+    if not near(src, def.coords) then
+        reject(src, 'buy-distance', 'You have to be at the business to buy it.')
+        return
+    end
 
-    local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
+    local row = MySQL.single.await('SELECT owner_citizenid FROM hc_businesses WHERE business_key = ?', { key })
     if row and row.owner_citizenid and row.owner_citizenid ~= '' then
         exports['hc-core']:Notify(src, 'This business is already owned.', 'error')
         return
@@ -70,22 +109,49 @@ RegisterNetEvent('hc-business:server:buy', function(key)
         return
     end
 
-    MySQL.insert.await(
-        'INSERT INTO hc_businesses (business_key, label, owner_citizenid, price, balance, employees) VALUES (?, ?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE owner_citizenid = VALUES(owner_citizenid), employees = VALUES(employees)',
-        { key, def.label, Player.PlayerData.citizenid, def.price, '[]' }
+    -- Claim it in one conditional write so two simultaneous buyers cannot both
+    -- end up owning it. The loser gets their money straight back.
+    MySQL.query.await(
+        'INSERT IGNORE INTO hc_businesses (business_key, label, price, balance, employees) VALUES (?, ?, ?, 0, ?)',
+        { key, def.label, def.price, '[]' }
     )
+    local claimed = MySQL.update.await(
+        [[UPDATE hc_businesses SET owner_citizenid = ?, employees = '[]'
+          WHERE business_key = ? AND (owner_citizenid IS NULL OR owner_citizenid = '')]],
+        { Player.PlayerData.citizenid, key }
+    )
+
+    if not claimed or claimed == 0 then
+        Player.Functions.AddMoney('bank', def.price, 'hc-business-buy-refund')
+        exports['hc-core']:Notify(src, 'Someone bought it first — you were refunded.', 'error')
+        return
+    end
+
+    exports['hc-core']:LogMoney(src, 'hc-business-buy', -def.price, def.label)
     exports['hc-core']:Notify(src, ('You bought %s!'):format(def.label), 'success')
 end)
 
 RegisterNetEvent('hc-business:server:deposit', function(key, amount)
     local src = source
+    if not rateLimit(src, 'business:deposit', 1000) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
-    amount = tonumber(amount) or 0
-    if amount <= 0 then return end
 
-    local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
-    if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then return end
+    local def = getDef(key)
+    if not def then return end
+    if not near(src, def.coords) then
+        reject(src, 'deposit-distance', 'You are not at the business desk.')
+        return
+    end
+
+    amount = sanitizeAmount(src, amount)
+    if not amount then return end
+
+    local row = MySQL.single.await('SELECT owner_citizenid FROM hc_businesses WHERE business_key = ?', { key })
+    if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then
+        reject(src, 'deposit-notowner')
+        return
+    end
 
     if not Player.Functions.RemoveMoney('bank', amount, 'hc-business-deposit') then
         exports['hc-core']:Notify(src, 'Not enough bank money.', 'error')
@@ -93,34 +159,59 @@ RegisterNetEvent('hc-business:server:deposit', function(key, amount)
     end
 
     MySQL.update.await('UPDATE hc_businesses SET balance = balance + ? WHERE business_key = ?', { amount, key })
+    exports['hc-core']:LogMoney(src, 'hc-business-deposit', -amount, key)
     exports['hc-core']:Notify(src, ('Deposited $%s'):format(amount), 'success')
 end)
 
 RegisterNetEvent('hc-business:server:withdraw', function(key, amount)
     local src = source
+    if not rateLimit(src, 'business:withdraw', 1000) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
-    amount = tonumber(amount) or 0
-    if amount <= 0 then return end
 
-    local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
-    if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then return end
-    if (row.balance or 0) < amount then
-        exports['hc-core']:Notify(src, 'Business balance too low.', 'error')
+    local def = getDef(key)
+    if not def then return end
+    if not near(src, def.coords) then
+        reject(src, 'withdraw-distance', 'You are not at the business desk.')
         return
     end
 
-    MySQL.update.await('UPDATE hc_businesses SET balance = balance - ? WHERE business_key = ?', { amount, key })
+    amount = sanitizeAmount(src, amount)
+    if not amount then return end
+
+    -- Ownership, funds and the debit all happen in ONE conditional statement.
+    -- Reading the balance and then writing it lets two parallel withdrawals
+    -- both pass the check and drain the business twice.
+    local affected = MySQL.update.await(
+        [[UPDATE hc_businesses SET balance = balance - ?
+          WHERE business_key = ? AND owner_citizenid = ? AND balance >= ?]],
+        { amount, key, Player.PlayerData.citizenid, amount }
+    )
+
+    if not affected or affected == 0 then
+        exports['hc-core']:Notify(src, 'Not your business, or the balance is too low.', 'error')
+        return
+    end
+
     Player.Functions.AddMoney('bank', amount, 'hc-business-withdraw')
+    exports['hc-core']:LogMoney(src, 'hc-business-withdraw', amount, key)
     exports['hc-core']:Notify(src, ('Withdrew $%s'):format(amount), 'success')
 end)
 
 RegisterNetEvent('hc-business:server:hire', function(key, targetId)
     local src = source
+    if not rateLimit(src, 'business:hire', 1000) then return end
+    local def = getDef(key)
+    if not def then return end
+
     local Player = QBCore.Functions.GetPlayer(src)
     local Target = QBCore.Functions.GetPlayer(tonumber(targetId))
     if not Player or not Target then
         exports['hc-core']:Notify(src, 'Player not found.', 'error')
+        return
+    end
+    if not near(src, def.coords) then
+        reject(src, 'hire-distance', 'You are not at the business desk.')
         return
     end
 
@@ -146,9 +237,17 @@ end)
 
 RegisterNetEvent('hc-business:server:fire', function(key, targetId)
     local src = source
+    if not rateLimit(src, 'business:fire', 1000) then return end
+    local def = getDef(key)
+    if not def then return end
+
     local Player = QBCore.Functions.GetPlayer(src)
     local Target = QBCore.Functions.GetPlayer(tonumber(targetId))
     if not Player then return end
+    if not near(src, def.coords) then
+        reject(src, 'fire-distance', 'You are not at the business desk.')
+        return
+    end
 
     local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
     if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then return end
@@ -173,29 +272,48 @@ end)
 
 RegisterNetEvent('hc-business:server:sell', function(key)
     local src = source
+    if not rateLimit(src, 'business:sell', 3000) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     local def = getDef(key)
     if not def then return end
+    if not near(src, def.coords) then
+        reject(src, 'sell-distance', 'You are not at the business desk.')
+        return
+    end
 
-    local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
-    if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then return end
+    local row = MySQL.single.await('SELECT balance, owner_citizenid FROM hc_businesses WHERE business_key = ?', { key })
+    if not row or row.owner_citizenid ~= Player.PlayerData.citizenid then
+        reject(src, 'sell-notowner')
+        return
+    end
+
+    -- Release ownership first, and only pay out if THIS call is the one that
+    -- released it — otherwise a double-click pays the refund twice.
+    local released = MySQL.update.await(
+        [[UPDATE hc_businesses SET owner_citizenid = NULL, balance = 0, employees = '[]'
+          WHERE business_key = ? AND owner_citizenid = ?]],
+        { key, Player.PlayerData.citizenid }
+    )
+    if not released or released == 0 then return end
 
     local refund = math.floor(def.price * 0.5) + (row.balance or 0)
-    MySQL.update.await(
-        'UPDATE hc_businesses SET owner_citizenid = NULL, balance = 0, employees = ? WHERE business_key = ?',
-        { '[]', key }
-    )
     Player.Functions.AddMoney('bank', refund, 'hc-business-sell')
+    exports['hc-core']:LogMoney(src, 'hc-business-sell', refund, def.label)
     exports['hc-core']:Notify(src, ('Sold business for $%s'):format(refund), 'success')
 end)
 
 RegisterNetEvent('hc-business:server:openStash', function(key)
     local src = source
+    if not rateLimit(src, 'business:stash', 1000) then return end
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     local def = getDef(key)
     if not def then return end
+    if not near(src, def.stashCoords or def.coords) then
+        reject(src, 'stash-distance', 'You are not at the stash.')
+        return
+    end
 
     local row = MySQL.single.await('SELECT * FROM hc_businesses WHERE business_key = ?', { key })
     local allowed = canAccess(row, Player.PlayerData.citizenid)

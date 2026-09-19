@@ -19,3 +19,11 @@ run.cmd
 
 .DS_Store
 node_modules/
+
+# Client-supplied packs (large, third-party; unpack on VPS, never commit)
+Files/
+server-data/resources/[assets]/
+server-data/resources/[stream]/
+
+# unpack-client-files.sh scratch space
+.unpack-*/

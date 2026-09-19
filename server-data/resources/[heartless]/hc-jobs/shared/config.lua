@@ -8,6 +8,12 @@ Config.JobCenter = {
 Config.StopsPerRun = 3
 Config.ProgressMs = 5000
 
+-- How close the server requires you to be to a stop / turn-in before it counts.
+-- Keep this a little larger than the client's own check so normal desync does
+-- not reject an honest player.
+Config.InteractDistance = 12.0
+Config.DepotDistance = 18.0
+
 --[[
   Each job:
   - vehicle: spawn model at depot (nil = on foot)

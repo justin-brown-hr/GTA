@@ -1,13 +1,19 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
+--[[
+    The server owns the route: it hands us `stopIndices` (indices into
+    Config.Jobs[].stops) and confirms each stop before we move on. Nothing here
+    decides that a stop or a run is finished — it only asks.
+]]
 local active = {
     jobId = nil,
     label = nil,
     vehicle = nil,
     blip = nil,
-    stopIndex = 0,
-    stops = {},
-    phase = 'idle', -- idle | stops | sell | return
+    stopIndex = 0,      -- position in active.stopIndices (1-based)
+    stopIndices = {},   -- server-issued indices into job.stops
+    awaiting = false,   -- waiting on the server to confirm the current stop
+    phase = 'idle',     -- idle | stops | sell | return
 }
 
 local function clearBlip()
@@ -30,21 +36,27 @@ local function setWaypoint(coords, text)
     SetNewWaypoint(coords.x, coords.y)
 end
 
-local function deleteJobVehicle()
-    if active.vehicle and DoesEntityExist(active.vehicle) then
-        DeleteEntity(active.vehicle)
-    end
+-- The work vehicle belongs to the server: it spawns it, checks it is back at
+-- the depot, and deletes it. The client only keeps a handle to it.
+local function forgetJobVehicle()
     active.vehicle = nil
 end
 
 local function resetActive()
     clearBlip()
-    deleteJobVehicle()
+    forgetJobVehicle()
     active.jobId = nil
     active.label = nil
     active.stopIndex = 0
-    active.stops = {}
+    active.stopIndices = {}
+    active.awaiting = false
     active.phase = 'idle'
+end
+
+--- Resolve the current server-issued stop to world coords.
+local function currentStopCoords(job)
+    local index = active.stopIndices[active.stopIndex]
+    return index and job.stops[index] or nil
 end
 
 local function getJobDef(id)
@@ -53,32 +65,47 @@ local function getJobDef(id)
     end
 end
 
-local function pickStops(job)
-    local pool = {}
-    for i = 1, #job.stops do pool[i] = job.stops[i] end
-    local chosen = {}
-    local need = math.min(Config.StopsPerRun, #pool)
-    for _ = 1, need do
-        local idx = math.random(#pool)
-        chosen[#chosen + 1] = pool[idx]
-        table.remove(pool, idx)
+--- Server-set plates are applied by whichever client owns the vehicle, so make
+--- sure it stuck once we are driving it — keys are matched by plate.
+local function ensurePlate(veh, plate)
+    if not plate then return end
+    for _ = 1, 40 do -- up to ~2s for ownership to pass to us after the warp
+        if NetworkGetEntityOwner(veh) == PlayerId() then break end
+        Wait(50)
     end
-    return chosen
+    local current = (GetVehicleNumberPlateText(veh) or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if current ~= plate and NetworkGetEntityOwner(veh) == PlayerId() then
+        SetVehicleNumberPlateText(veh, plate)
+    end
 end
 
-local function spawnJobVehicle(job)
-    if not job.vehicle then return true end
+--- Get into the vehicle the server created at the depot. A networked entity
+--- only exists on clients within range of it, so go there first.
+local function enterWorkVehicle(job, netId, plate)
+    if not netId then return end
     local d = job.depot
-    lib.requestModel(job.vehicle)
-    local veh = CreateVehicle(joaat(job.vehicle), d.x, d.y, d.z, d.w, true, false)
-    SetVehicleOnGroundProperly(veh)
-    SetVehicleNumberPlateText(veh, 'HCJOB')
-    SetEntityAsMissionEntity(veh, true, true)
-    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
-    SetModelAsNoLongerNeeded(job.vehicle)
-    active.vehicle = veh
-    TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
-    return true
+    local ped = PlayerPedId()
+    if #(GetEntityCoords(ped) - vec3(d.x, d.y, d.z)) > 150.0 then
+        DoScreenFadeOut(300)
+        while not IsScreenFadedOut() do Wait(10) end
+        SetEntityCoords(ped, d.x + 3.0, d.y, d.z, false, false, false, false)
+    end
+    local veh
+    for _ = 1, 100 do -- up to ~5s to stream in
+        if NetworkDoesNetworkIdExist(netId) then
+            veh = NetToVeh(netId)
+            if veh ~= 0 and DoesEntityExist(veh) then break end
+        end
+        Wait(50)
+    end
+    if veh and veh ~= 0 then
+        TaskWarpPedIntoVehicle(ped, veh, -1)
+        active.vehicle = veh
+        ensurePlate(veh, plate)
+    else
+        lib.notify({ title = 'Jobs', description = 'Your work vehicle is at the depot.', type = 'inform' })
+    end
+    if IsScreenFadedOut() then DoScreenFadeIn(500) end
 end
 
 local function doProgress(label)
@@ -96,13 +123,17 @@ local function doProgress(label)
     })
 end
 
-local function advanceOrFinish(job)
-    active.stopIndex = active.stopIndex + 1
-    if active.stopIndex <= #active.stops then
-        setWaypoint(active.stops[active.stopIndex], ('%s stop %s/%s'):format(job.label, active.stopIndex, #active.stops))
+--- Called only from hc-jobs:client:stopConfirmed — the server has accepted the
+--- stop we just worked and told us how far along we are.
+local function advanceOrFinish(job, confirmed, total)
+    active.stopIndex = confirmed + 1
+    if active.stopIndex <= total then
+        local coords = currentStopCoords(job)
+        if not coords then return end
+        setWaypoint(coords, ('%s stop %s/%s'):format(job.label, active.stopIndex, total))
         lib.notify({
             title = job.label,
-            description = ('Go to stop %s of %s'):format(active.stopIndex, #active.stops),
+            description = ('Go to stop %s of %s'):format(active.stopIndex, total),
             type = 'inform',
         })
         return
@@ -123,15 +154,15 @@ local function advanceOrFinish(job)
         return
     end
 
+    -- The server resets us via hc-jobs:client:runComplete once it has paid.
     TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-    resetActive()
 end
 
 local function tryCompleteCurrentStop()
-    if active.phase ~= 'stops' or not active.jobId then return end
+    if active.phase ~= 'stops' or not active.jobId or active.awaiting then return end
     local job = getJobDef(active.jobId)
     if not job then return end
-    local target = active.stops[active.stopIndex]
+    local target = currentStopCoords(job)
     if not target then return end
 
     local ped = PlayerPedId()
@@ -151,7 +182,16 @@ local function tryCompleteCurrentStop()
     }
 
     if doProgress(labels[job.id] or 'Working...') then
-        advanceOrFinish(job)
+        local pending = active.stopIndex
+        active.awaiting = true
+        TriggerServerEvent('hc-jobs:server:completeStop', job.id, active.stopIndices[pending])
+        -- Fallback: if the server never answers (throttled, restarting), let the
+        -- player try the stop again rather than leaving the job unusable.
+        SetTimeout(10000, function()
+            if active.awaiting and active.stopIndex == pending then
+                active.awaiting = false
+            end
+        end)
     else
         lib.notify({ title = 'Jobs', description = 'Cancelled.', type = 'error' })
     end
@@ -170,8 +210,8 @@ local function trySellOrReturn()
             return
         end
         if doProgress('Turning in...') then
+            -- Stay on the job until the server confirms (hc-jobs:client:runComplete).
             TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-            resetActive()
         end
         return
     end
@@ -182,9 +222,14 @@ local function trySellOrReturn()
             lib.notify({ title = 'Jobs', description = 'Return to the depot.', type = 'error' })
             return
         end
-        deleteJobVehicle()
+        if active.vehicle and DoesEntityExist(active.vehicle)
+            and #(GetEntityCoords(active.vehicle) - depot) > Config.DepotDistance then
+            lib.notify({ title = 'Jobs', description = 'Bring the work vehicle back to the depot.', type = 'error' })
+            return
+        end
+        -- Stay on the job until the server confirms (hc-jobs:client:runComplete);
+        -- if it refuses, the player can fix the problem and try again.
         TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-        resetActive()
     end
 end
 
@@ -215,25 +260,48 @@ local function openJobCenter()
     lib.showContext('hc_job_center')
 end
 
-RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label)
+RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label, stopIndices, vehicleNetId, vehiclePlate)
     local job = getJobDef(jobId)
-    if not job then return end
+    if not job or type(stopIndices) ~= 'table' or #stopIndices == 0 then return end
 
     resetActive()
     active.jobId = jobId
     active.label = label
-    active.stops = pickStops(job)
+    active.stopIndices = stopIndices
     active.stopIndex = 1
     active.phase = 'stops'
 
-    spawnJobVehicle(job)
-    setWaypoint(active.stops[1], ('%s stop 1/%s'):format(label, #active.stops))
+    enterWorkVehicle(job, vehicleNetId, vehiclePlate)
+    local first = currentStopCoords(job)
+    if not first then return end
+    setWaypoint(first, ('%s stop 1/%s'):format(label, #stopIndices))
     lib.notify({
         title = 'Heartless Jobs',
-        description = ('Started %s — complete %s stops. Use [E] at each marker.'):format(label, #active.stops),
+        description = ('Started %s — complete %s stops. Use [E] at each marker.'):format(label, #stopIndices),
         type = 'success',
         duration = 8000,
     })
+end)
+
+--- The server paid out: the run is over.
+RegisterNetEvent('hc-jobs:client:runComplete', function(jobId)
+    if active.jobId == jobId then resetActive() end
+end)
+
+--- The server refused the stop — let the player work it again.
+RegisterNetEvent('hc-jobs:client:stopRejected', function(jobId)
+    if active.jobId == jobId then
+        active.awaiting = false
+    end
+end)
+
+--- The server accepted the stop we just worked.
+RegisterNetEvent('hc-jobs:client:stopConfirmed', function(jobId, confirmed, total)
+    active.awaiting = false
+    if active.jobId ~= jobId then return end
+    local job = getJobDef(jobId)
+    if not job then return end
+    advanceOrFinish(job, confirmed, total)
 end)
 
 RegisterNetEvent('hc-jobs:client:forceStop', function()
@@ -246,7 +314,7 @@ CreateThread(function()
     SetBlipDisplay(blip, 4)
     SetBlipScale(blip, 0.85)
     SetBlipColour(blip, 2)
-    SetBlipAsShortRange(blip, true)
+    SetBlipAsShortRange(blip, false)
     BeginTextCommandSetBlipName('STRING')
     AddTextComponentSubstringPlayerName(Config.JobCenter.label)
     EndTextCommandSetBlipName(blip)
@@ -278,7 +346,8 @@ CreateThread(function()
             local prompt = false
 
             if active.phase == 'stops' then
-                local target = active.stops[active.stopIndex]
+                local job = getJobDef(active.jobId)
+                local target = job and currentStopCoords(job) or nil
                 if target and #(coords - target) < 15.0 then
                     prompt = true
                     lib.showTextUI('[E] Work this stop')

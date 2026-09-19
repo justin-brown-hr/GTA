@@ -23,5 +23,7 @@ server_scripts {
 dependencies {
     'qb-core',
     'ox_lib',
+    'ox_inventory',
+    'ox_target',
     'hc-core',
 }

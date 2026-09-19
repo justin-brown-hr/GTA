@@ -22,6 +22,7 @@ server_scripts {
 
 dependencies {
     'qb-core',
+    'qb-vehiclekeys',
     'ox_lib',
     'ox_target',
     'hc-core',

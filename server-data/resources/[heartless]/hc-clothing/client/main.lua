@@ -3,7 +3,7 @@ CreateThread(function()
         local blip = AddBlipForCoord(shop.coords.x, shop.coords.y, shop.coords.z)
         SetBlipSprite(blip, 73)
         SetBlipScale(blip, 0.7)
-        SetBlipAsShortRange(blip, true)
+        SetBlipAsShortRange(blip, false)
         BeginTextCommandSetBlipName('STRING')
         AddTextComponentSubstringPlayerName(shop.label)
         EndTextCommandSetBlipName(blip)
@@ -18,14 +18,14 @@ CreateThread(function()
                     icon = 'fa-solid fa-shirt',
                     label = 'Browse fashion',
                     onSelect = function()
-                        -- Falls back to notify if appearance resource missing
-                        local ok = pcall(function()
+                        if GetResourceState('illenium-appearance') == 'started' then
                             TriggerEvent(shop.appearanceEvent)
-                        end)
-                        if not ok then
+                        elseif GetResourceState('qb-clothing') == 'started' then
+                            TriggerEvent(shop.qbEvent)
+                        else
                             lib.notify({
                                 title = shop.label,
-                                description = 'Install illenium-appearance (or change appearanceEvent in config).',
+                                description = 'Install illenium-appearance or qb-clothing.',
                                 type = 'error',
                             })
                         end

@@ -1,6 +1,11 @@
 Config = {}
 
 Config.MaxEmployees = 5
+
+-- Server-side guards: how close you must be to the desk / stash, and the
+-- ceiling on a single deposit or withdrawal.
+Config.InteractDistance = 12.0
+Config.MaxTransaction = 5000000
 Config.StashSlots = 50
 Config.StashWeight = 200000
 
@@ -48,5 +53,21 @@ Config.Businesses = {
         coords = vec3(842.2, -1033.4, 28.2),
         stashCoords = vec3(846.5, -1035.1, 28.2),
         type = 'weapons',
+    },
+    {
+        key = 'limeys',
+        label = 'Limeys Juice',
+        price = 90000,
+        coords = vec3(-1253.5, -1483.6, 4.3),
+        stashCoords = vec3(-1256.2, -1481.1, 4.3),
+        type = 'shop',
+    },
+    {
+        key = 'galaxy_club',
+        label = 'Galaxy Club',
+        price = 400000,
+        coords = vec3(-430.1, -23.5, 46.2),
+        stashCoords = vec3(-427.0, -21.2, 46.2),
+        type = 'bar',
     },
 }

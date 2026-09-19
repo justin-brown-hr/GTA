@@ -1,5 +1,11 @@
 Config = {}
 
+Config.PdAlertChance = 0.28
+Config.GatherCooldownMs = 8000
+-- Minimum gap between two street sales by the same player.
+Config.SellCooldownMs = 2500
+Config.ProcessNeed = 1
+
 -- Custom Heartless strains (register matching items in ox_inventory)
 Config.Drugs = {
     {
@@ -18,7 +24,7 @@ Config.Drugs = {
         gatherItem = 'cc_raw',
         productItem = 'cc_brick',
         gatherCoords = vec3(2433.0, 4969.0, 42.3),
-        processCoords = vec3(2433.0, 4969.0, 46.8),
+        processCoords = vec3(1394.2, 3608.5, 38.9),
         sellPriceMin = 200,
         sellPriceMax = 320,
     },
@@ -28,7 +34,7 @@ Config.Drugs = {
         gatherItem = 'nn_chem',
         productItem = 'nn_vial',
         gatherCoords = vec3(3536.0, 3660.0, 28.1),
-        processCoords = vec3(3538.0, 3662.0, 28.1),
+        processCoords = vec3(1396.8, 3611.0, 38.9),
         sellPriceMin = 250,
         sellPriceMax = 400,
     },

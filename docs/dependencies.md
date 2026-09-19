@@ -31,12 +31,26 @@ These are **not** vendored in this repo (licenses / size). Install into the fold
 |---------|-----|
 | Tebex | Exclusive dealership packages → `hc-dealership` grant |
 
-## Assets (client supply or licensed)
+The `tebex` resource (downloaded from your Tebex panel → Game Servers) must be
+installed and `ensure`d for store commands to reach the server. Setup and test
+matrix: `docs/tebex-setup.md`.
 
-- Custom vehicle packs (exclusive lot)
-- Clothing / EUP packs
-- Weapon metas / models
-- Optional island / zombie MLO
+## Client packs (`Files/`)
+
+Full audit of what is in every pack — confirmed spawn names, what is FiveM-ready
+and what is not — is in `docs/client-assets.md`.
+
+Unpack with `scripts/unpack-client-files.sh`, which needs **unrar** on the VPS:
+
+```bash
+sudo apt-get install -y unrar
+```
+
+p7zip cannot decompress RAR5 (most of the drop), and `unar` silently drops files.
+Then `ensure` each installed resource by name — **not** `ensure [assets]`, which
+has broken joins on this server before.
+
+Licensed / client-supplied only: vehicles, clothing, weapons, MLOs. Do not pirate packs.
 
 ## Install order in `server.cfg`
 
@@ -44,4 +58,5 @@ These are **not** vendored in this repo (licenses / size). Install into the fold
 2. `qb-core`
 3. ox_inventory / ox_target / voice
 4. qb-* gameplay
-5. `ensure [heartless]` (or each `hc-*` resource)
+5. `ensure [assets]` (client cars/guns/MLOs)
+6. `ensure [heartless]` (or each `hc-*` resource)

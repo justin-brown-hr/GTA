@@ -37,10 +37,10 @@ Use this with the client for scope, milestones, and invoicing.
 
 ## Phase 2 — Illegal + firearms (Weeks 3–4)
 
-- [ ] `hc-drugs`: 3+ custom drug strains (gather → process → sell)
-- [ ] Police heat / risk on sells
-- [ ] `hc-scam`: purchasable scam kits / tools with cooldowns & risk
-- [ ] `hc-weapons`: realistic weapon pack + shop; customs locked behind purchase
+- [x] `hc-drugs`: 3+ custom drug strains (gather → process → sell)
+- [x] Police heat / risk on sells
+- [x] `hc-scam`: purchasable scam kits / tools with cooldowns & risk
+- [x] `hc-weapons`: realistic weapon pack + shop; customs locked behind purchase
 - [ ] Basic PD / EMS job hooks (can use QB defaults first)
 
 **Client deliverable:** Illegal loops + gun economy working on staging.
@@ -49,10 +49,10 @@ Use this with the client for scope, milestones, and invoicing.
 
 ## Phase 3 — Heists, fashion, cars (Weeks 5–6)
 
-- [ ] `hc-heists`: 2–3 heists (store, bank, specialty) with roles & cooldown
-- [ ] `hc-clothing`: updated fashion EUP / clothing packs + shop
-- [ ] Public dealership (in-game cash/bank)
-- [ ] `hc-dealership` exclusive lot: Tebex packages → unique cars only
+- [x] `hc-heists`: 2–3 heists (store, bank, specialty) with roles & cooldown
+- [x] `hc-clothing`: updated fashion EUP / clothing packs + shop
+- [x] Public dealership (in-game cash/bank)
+- [x] `hc-dealership` exclusive lot: Tebex packages → unique cars only
 - [ ] Custom vehicle pack install + handling pass
 
 **Client deliverable:** Full “city loop” demo for Discord launch trailer.
@@ -61,10 +61,10 @@ Use this with the client for scope, milestones, and invoicing.
 
 ## Phase 4 — Zombie survival side-map (Weeks 7–8)
 
-- [ ] `hc-zombie`: separate routing bucket / island or map edge
-- [ ] Entry NPC / portal from main city
-- [ ] Loot, zombies, extract-back-to-city rewards
-- [ ] Balance so it does not break main RP economy
+- [x] `hc-zombie`: separate routing bucket / island or map edge
+- [x] Entry NPC / portal from main city
+- [x] Loot, zombies, extract-back-to-city rewards
+- [x] Balance so it does not break main RP economy
 
 **Client deliverable:** Optional survival mode live alongside RP.
 

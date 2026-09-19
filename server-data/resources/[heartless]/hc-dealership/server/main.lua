@@ -12,26 +12,47 @@ local function getExclusive(model)
     end
 end
 
-local function randomPlate()
-    local chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    local plate = 'HC'
-    for _ = 1, 6 do
-        local i = math.random(#chars)
-        plate = plate .. chars:sub(i, i)
-    end
-    return plate
+--- Server-side distance check — you buy at the lot, not from your sofa.
+local function near(src, coords, dist)
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 or not coords then return false end
+    return #(GetEntityCoords(ped) - coords) <= (dist or Config.LotDistance)
+end
+
+local function reject(src, reason, msg)
+    exports['hc-core']:Flag(src, 'dealer:' .. reason)
+    if msg then exports['hc-core']:Notify(src, msg, 'error') end
 end
 
 RegisterNetEvent('hc-dealership:server:buyPublic', function(model)
     local src = source
+    if not exports['hc-core']:RateLimit(src, 'dealer:buy', 3000) then return end
+
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
-    local veh = getPublic(model)
-    if not veh then return end
 
-    -- Block buying exclusive models with in-game money
+    if type(model) ~= 'string' then return end
+
+    -- Block buying exclusive models with in-game money.
     if getExclusive(model) then
-        exports['hc-core']:Notify(src, 'That vehicle is exclusive — real money only.', 'error')
+        reject(src, 'buy-exclusive', 'That vehicle is exclusive — real money only.')
+        return
+    end
+
+    local veh = getPublic(model)
+    if not veh then
+        reject(src, 'buy-badmodel')
+        return
+    end
+
+    if not near(src, Config.PublicLot.coords) then
+        reject(src, 'buy-distance', 'You have to be at the lot to buy a car.')
+        return
+    end
+
+    local plate = HCUniquePlate()
+    if not plate then
+        exports['hc-core']:Notify(src, 'Could not issue a plate — try again.', 'error')
         return
     end
 
@@ -40,73 +61,18 @@ RegisterNetEvent('hc-dealership:server:buyPublic', function(model)
         return
     end
 
-    local plate = randomPlate()
-    -- Integrate with your garage table (qb-vehicles / player_vehicles)
-    MySQL.insert.await(
-        'INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, garage, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        {
-            Player.PlayerData.license,
-            Player.PlayerData.citizenid,
-            model,
-            joaat(model),
-            '{}',
-            plate,
-            'pillboxgarage',
-            0,
-        }
-    )
-    TriggerClientEvent('hc-dealership:client:spawnPurchased', src, model, plate)
-    exports['hc-core']:Notify(src, ('Purchased %s'):format(veh.label), 'success')
-end)
-
---- Called by Tebex game server commands / webhook bridge
---- Example command from Tebex: hc_tebex_grant {id} hc_exclusive1
-RegisterCommand('hc_tebex_grant', function(source, args)
-    if source ~= 0 then return end -- console / tebex only
-    local citizenOrServerId = args[1]
-    local model = args[2]
-    if not citizenOrServerId or not model then
-        print('[hc-dealership] Usage: hc_tebex_grant <serverId|citizenid> <model>')
+    if not HCGiveVehicle(Player, model, plate) then
+        Player.Functions.AddMoney('bank', veh.price, 'hc-dealer-public-refund')
+        exports['hc-core']:Notify(src, 'Registration failed — you were refunded.', 'error')
         return
     end
 
-    local exclusive = getExclusive(model)
-    if not exclusive then
-        print('[hc-dealership] Model not in exclusive list: ' .. tostring(model))
-        return
-    end
-
-    local Player
-    local sid = tonumber(citizenOrServerId)
-    if sid then
-        Player = QBCore.Functions.GetPlayer(sid)
+    exports['hc-core']:LogMoney(src, 'hc-dealer-public', -veh.price, ('%s (%s)'):format(model, plate))
+    local netId = HCSpawnOwnedVehicle(src, model, veh.type, Config.PublicSpawn, plate)
+    if netId then
+        TriggerClientEvent('hc-dealership:client:vehicleReady', src, netId, plate)
+        exports['hc-core']:Notify(src, ('Purchased %s'):format(veh.label), 'success')
     else
-        Player = QBCore.Functions.GetPlayerByCitizenId(citizenOrServerId)
+        exports['hc-core']:Notify(src, ('Purchased %s — it is waiting in your garage.'):format(veh.label), 'success')
     end
-    if not Player then
-        print('[hc-dealership] Player not online for grant')
-        return
-    end
-
-    local plate = randomPlate()
-    local txId = ('tebex-%s-%s'):format(model, os.time())
-    MySQL.insert.await(
-        'INSERT INTO hc_tebex_grants (transaction_id, citizenid, model, plate) VALUES (?, ?, ?, ?)',
-        { txId, Player.PlayerData.citizenid, model, plate }
-    )
-    MySQL.insert.await(
-        'INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, garage, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        {
-            Player.PlayerData.license,
-            Player.PlayerData.citizenid,
-            model,
-            joaat(model),
-            '{}',
-            plate,
-            'pillboxgarage',
-            0,
-        }
-    )
-    TriggerClientEvent('hc-dealership:client:spawnPurchased', Player.PlayerData.source, model, plate)
-    exports['hc-core']:Notify(Player.PlayerData.source, ('Exclusive vehicle granted: %s'):format(exclusive.label), 'success')
-end, true)
+end)
