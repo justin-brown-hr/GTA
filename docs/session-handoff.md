@@ -131,6 +131,24 @@ Continue from: [pick one]
 
 Replace the last line with whatever you need next.
 
+## 2026-09-19 VPS repo now tracks git — deploy with `git pull`
+
+The VPS checkout (`/opt/heartless/GTA`) was on the first commit with every
+change copied over by hand. It is now on `main` (verified file-by-file first:
+nothing on disk changed). From here on, deploy by pulling:
+
+```bash
+cd /opt/heartless/GTA
+git config --global --add safe.directory /opt/heartless/GTA   # once: the checkout is owned by another uid
+git pull
+# then restart only what changed — and never hc-core on its own (see below)
+```
+
+`.gitignore` was fixed at the same time: `[stream]`, `[qb]` etc. were never
+actually ignored (brackets are wildcards in .gitignore), and FXServer's 32 GB
+`server-data/cache` was not listed. A `git add -A` on the VPS would have tried
+to commit all of it.
+
 ## 2026-09-19 Nightly database backups live
 
 - `heartless-db-backup.timer` runs `scripts/backup-db.sh` at 04:30 daily,
