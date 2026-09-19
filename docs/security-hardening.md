@@ -184,7 +184,8 @@ Each one used to pay out or succeed. All of them must now fail.
   abused, not menu users spawning cars or god mode).
 - **`player_vehicles.plate` unique index** — the migration has the statement,
   commented, with the duplicate check to run first.
-- **Off-box backups.** `scripts/backup-db.sh` dumps and prunes locally; a backup
-  that only exists on the machine that dies is not a backup.
+- **Off-box backups.** Nightly local backups now run on the VPS and a restore
+  was tested (see `docs/vps-ubuntu.md`). They still live on the same disk as
+  the database — an off-VPS copy needs a destination from the client.
 - **Business deposit/withdraw are hardcoded to $1000** in the client menu — the
   server accepts any sane amount, the UI just never asks for one.

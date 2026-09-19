@@ -131,6 +131,16 @@ Continue from: [pick one]
 
 Replace the last line with whatever you need next.
 
+## 2026-09-19 Nightly database backups live
+
+- `heartless-db-backup.timer` runs `scripts/backup-db.sh` at 04:30 daily,
+  14-day retention in `/opt/heartless/backups/`. Details: `docs/vps-ubuntu.md`.
+- Fixed two script bugs first: it connected over TCP, which the VPS's socket-
+  authenticated root cannot use (every run would have failed), and a failed dump
+  could leave a broken file posing as the latest backup.
+- Restore tested into a throwaway DB: 18/18 tables match.
+- Not yet: an off-VPS copy — needs a destination from the client.
+
 ## 2026-09-19 Vehicles spawned server-side + garage-state bug fixed
 
 - `hc-jobs` and `hc-dealership` no longer create vehicles on the client. The

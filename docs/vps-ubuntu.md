@@ -139,3 +139,26 @@ After a soft lockup (SSH + FiveM stopped answering, no clean OOM log):
 - `vm.oom_kill_allocating_task=1` via `/etc/sysctl.d/99-heartless-stability.conf`
 - `heartless-fx.service`: `MemoryHigh=7G`, `MemoryMax=8G`, `Restart=always`, `OOMScoreAdjust=500`
 - Watchdog timer: `/usr/local/bin/heartless-fx-watchdog.sh` every 1m — restarts FX after 3 failed `dynamic.json` checks
+
+## Database backups (2026-09-19)
+
+Nightly at **04:30** via systemd (`heartless-db-backup.timer` →
+`heartless-db-backup.service` → `scripts/backup-db.sh`). Runs at low CPU/IO
+priority, and `Persistent=true` catches up on a night the VPS was off.
+
+- Dumps go to `/opt/heartless/backups/` (mode 700), kept **14 days**.
+- A dump is only kept if gzip can read it and it contains tables; a failed
+  run leaves the previous backups untouched.
+- Restore was tested on 2026-09-19: loaded into a throwaway database, all 18
+  tables matched the live row counts.
+
+```bash
+systemctl list-timers heartless-db-backup.timer       # next / last run
+journalctl -u heartless-db-backup --since today       # what it did
+sudo bash /opt/heartless/GTA/scripts/backup-db.sh     # run one now
+gunzip -c /opt/heartless/backups/<file>.sql.gz | mysql heartless_city   # restore
+```
+
+**Still missing: an off-VPS copy.** Every backup lives on the same disk as the
+database, so it does not survive losing the VPS itself. Needs a destination
+from the client (object storage, another box, or a scheduled download).
