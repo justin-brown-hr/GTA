@@ -12,18 +12,31 @@ FXServer*
 run.sh
 run.cmd
 
-# Large dependency folders if cloned locally (optional ignore)
-# server-data/resources/[qb]/
-# server-data/resources/[standalone]/
-# server-data/resources/[cfx]/
+# Third-party resources — installed on the server (scripts/clone-stack.sh),
+# never vendored here. Only our own [heartless] resources live in git.
+# NOTE: brackets must be escaped — in .gitignore `[qb]` is a wildcard meaning
+# "the letter q or b", so an unescaped `[qb]/` never matches the folder.
+server-data/resources/\[qb\]/
+server-data/resources/\[standalone\]/
+server-data/resources/\[cfx\]/
+server-data/resources/\[voice\]/
+
+# FXServer's runtime cache: rebuilt from the resources on every boot, and
+# 30+ GB once the clothing packs are installed. A `git add -A` on the VPS
+# without this line tries to hash all of it.
+server-data/cache/
+
+# Generated files
+__pycache__/
+docs/unpack-report.txt
 
 .DS_Store
 node_modules/
 
 # Client-supplied packs (large, third-party; unpack on VPS, never commit)
 Files/
-server-data/resources/[assets]/
-server-data/resources/[stream]/
+server-data/resources/\[assets\]/
+server-data/resources/\[stream\]/
 
 # unpack-client-files.sh scratch space
 .unpack-*/
