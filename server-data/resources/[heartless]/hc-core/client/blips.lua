@@ -20,14 +20,15 @@ exports('AddCityBlip', addBlip)
 
 CreateThread(function()
     -- Landmarks / MLO areas (approx entrance coords)
-    addBlip(vec3(4840.8, -5174.6, 2.1), 310, 1, 0.85, 'HC Island / Deadzone')
+    -- Alamo Sea island (anarchy_Island). Was pointing at Cayo Perico, which
+    -- does not exist on this server's game build.
+    addBlip(vec3(262.0, 3990.0, 30.0), 310, 1, 0.85, 'HC Alamo Island')
     addBlip(vec3(-56.8, -1096.6, 26.4), 326, 3, 0.8, 'HC Public Motors')
     addBlip(vec3(-783.5, -212.5, 37.0), 326, 5, 0.8, 'HC Exclusive Collection')
     addBlip(vec3(-552.6, -585.4, 34.7), 52, 0, 0.75, 'HC La Galeria Mall')
     addBlip(vec3(-365.5, -131.5, 38.7), 72, 5, 0.7, 'HC Customs / LSC')
     addBlip(vec3(-430.1, -23.5, 46.2), 93, 8, 0.75, 'HC Galaxy Club')
     addBlip(vec3(-1253.5, -1483.6, 4.3), 93, 2, 0.7, 'HC Limeys')
-    addBlip(vec3(1273.4, -3166.8, 5.9), 310, 1, 0.8, 'HC Deadzone Gate')
 end)
 
 -- Reliable inventory open (ox_inventory) — F2

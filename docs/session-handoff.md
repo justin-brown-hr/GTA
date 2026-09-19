@@ -131,6 +131,30 @@ Continue from: [pick one]
 
 Replace the last line with whatever you need next.
 
+## 2026-09-19 Deadzone rewritten + deployed
+
+- **Moved to the right island.** Config pointed at Cayo Perico (4840,-5174),
+  which does not exist on game build 1604. The client's island map is the Alamo
+  Sea one (`turbosaif_alamo_island`, x -6..527, y 3772..4205 — read from its
+  .ymap extents). Ground height and water are resolved in game, so an imperfect
+  point lands on the nearest dry ground instead of in the sea.
+- **Server-authoritative.** Zombies are created by the server in routing bucket
+  66 (population off, entity lockdown `strict` for that bucket only). A director
+  keeps a population around players, raises the wave every 3 min, culls
+  stragglers, credits kills from `GetPedSourceOfDeath`.
+- **Rules:** salvage + kill bonus paid only at an extract (8 s hold, two-step,
+  server-timed). Death inside forfeits salvage. Leaving the island pulls you back.
+- Deployed; loads clean, director idle-ticks with no errors. **Not yet tested
+  in game** — checklist in `docs/m2-acceptance.md`.
+
+### Deploy rule learned the hard way
+
+**Never `restart hc-core` on its own.** Every other `hc-*` depends on it, so
+FiveM stops all nine — and does not start them again. Either restart the whole
+service (`systemctl restart heartless-fx`, ~10 s boot, 0 players), or restart
+hc-core and then `ensure` each dependent. Restarting a leaf resource
+(hc-zombie, hc-jobs, …) on its own is fine.
+
 ## 2026-09-19 Deployed to the live VPS + client clothing installed
 
 **The VPS now runs this repo's code** (it was running the older, exploitable

@@ -56,9 +56,23 @@ Full store wiring and test matrix: [`docs/tebex-setup.md`](tebex-setup.md)
 
 ## Deadzone (`hc-zombie`)
 
-- [ ] Enter gate teleports into routing bucket 66
-- [ ] Loot caches; extract returns to city with capped cash
-- [ ] Island MLO streaming (`anarchy_Island`)
+The Deadzone is on the client's **Alamo Sea island** (`anarchy_Island`). It used
+to point at Cayo Perico, which does not exist on this server's game build —
+players were teleported into open ocean. Test all of these in game:
+
+- [ ] Docks gate → you land **on the island, on dry ground** (not in water)
+- [ ] Supply crates appear as you approach; searching gives salvage / ammo / bandage
+- [ ] Zombies spawn 35–70 m away, chase and attack; more of them with more players
+- [ ] "Wave 2" notice after 3 minutes inside; zombies get tougher
+- [ ] Walk off the island over a bridge → warned, then dragged back
+- [ ] Green extract marker → hold [E] 8 s → paid for salvage + kills (cap $2,500)
+- [ ] Die inside → salvage lost, normal death/respawn in the city
+- [ ] A second player sees the same zombies; a city player does not
+- [ ] `hc_dz_status` (server console) shows players, wave, zombie count
+
+If a crate or extract lands somewhere silly, stand where it should be, run
+`/dzpos` (admin), and paste the printed `vec3(...)` into
+`hc-zombie/shared/config.lua`.
 
 ## Live VPS status
 ## Live VPS status

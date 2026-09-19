@@ -210,7 +210,14 @@ more than one per slot they must be rebuilt as **addon** weapons with their own
 
 ## D. MLOs and libraries
 
-All 20 `anarchy_*` packs are proper FiveM resources and stream as-is. See
+All 20 `anarchy_*` packs are proper FiveM resources and stream as-is.
+
+Two of them are islands, easy to mix up:
+
+| Pack | Where (from its .ymap extents) | Used for |
+|------|-------------------------------|----------|
+| `anarchy_Island` | Alamo Sea, x -6..527 / y 3772..4205, bridges to Sandy + Grapeseed | **The Deadzone** (`hc-zombie`) |
+| `anarchy_IslandMH` | Mansion island off the west coast, x -3800..-2485 | City MLO only | See
 `server.cfg.example` for the ensure list and `docs/dependencies.md` for which
 script uses which.
 
