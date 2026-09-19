@@ -9,7 +9,8 @@ local QBCore = exports['qb-core']:GetCoreObject()
     timer — every stop has to be reached in the order the server handed out.
 ]]
 
---- [src] = { jobId, startedAt, stops = {indices}, progress = n, lastStopAt, paid }
+--- [src] = { jobId, startedAt, stops = {indices}, progress = n, lastStopAt, paid,
+---          vehicle = entity|nil, plate = string|nil }
 local sessions = {}
 
 local function getJob(id)
@@ -48,7 +49,42 @@ local function pickStopIndices(job)
     return chosen
 end
 
+--[[
+    Work vehicles are created by the SERVER, not the client. That keeps this
+    resource working under entity lockdown, and it means the server knows which
+    vehicle is the job's — so "return the vehicle to the depot" is actually
+    checked instead of trusted, and an abandoned van gets cleaned up.
+]]
+local function jobPlate()
+    return ('JOB%05d'):format(math.random(0, 99999))
+end
+
+local function spawnWorkVehicle(job, plate)
+    local d = job.depot
+    local veh = CreateVehicleServerSetter(joaat(job.vehicle), job.vehicleType or 'automobile', d.x, d.y, d.z, d.w)
+    for _ = 1, 100 do
+        if DoesEntityExist(veh) then break end
+        Wait(10)
+    end
+    if not DoesEntityExist(veh) then return nil end
+    SetVehicleNumberPlateText(veh, plate)
+    -- Keep it even if its network owner wanders out of range; this resource
+    -- deletes it explicitly when the run ends.
+    SetEntityOrphanMode(veh, 2)
+    return veh
+end
+
+local function removeWorkVehicle(session, src)
+    if not session or not session.vehicle then return end
+    if DoesEntityExist(session.vehicle) then DeleteEntity(session.vehicle) end
+    if src and session.plate and QBCore.Functions.GetPlayer(src) then
+        exports['qb-vehiclekeys']:RemoveKeys(src, session.plate)
+    end
+    session.vehicle, session.plate = nil, nil
+end
+
 local function clearSession(src)
+    removeWorkVehicle(sessions[src], src)
     sessions[src] = nil
     local Player = QBCore.Functions.GetPlayer(src)
     if Player then
@@ -85,7 +121,7 @@ RegisterNetEvent('hc-jobs:server:startJob', function(jobId)
         return
     end
 
-    sessions[src] = {
+    local session = {
         jobId = job.id,
         startedAt = os.time(),
         stops = stops,
@@ -93,8 +129,23 @@ RegisterNetEvent('hc-jobs:server:startJob', function(jobId)
         lastStopAt = 0,
         paid = false,
     }
+
+    local netId
+    if job.vehicle then
+        local plate = jobPlate()
+        local veh = spawnWorkVehicle(job, plate)
+        if not veh then
+            exports['hc-core']:Notify(src, 'The depot has no vehicle ready — try again in a moment.', 'error')
+            return
+        end
+        session.vehicle, session.plate = veh, plate
+        netId = NetworkGetNetworkIdFromEntity(veh)
+        exports['qb-vehiclekeys']:GiveKeys(src, plate)
+    end
+
+    sessions[src] = session
     Player.Functions.SetMetaData('hc_active_job', job.id)
-    TriggerClientEvent('hc-jobs:client:jobStarted', src, job.id, job.label, stops)
+    TriggerClientEvent('hc-jobs:client:jobStarted', src, job.id, job.label, stops, netId, session.plate)
 end)
 
 RegisterNetEvent('hc-jobs:server:cancelJob', function()
@@ -185,6 +236,19 @@ RegisterNetEvent('hc-jobs:server:completeRun', function(jobId)
             reject(src, 'run-depotdistance', 'Return the work vehicle to the depot.')
             return
         end
+        -- The player being at the depot is not enough: the VEHICLE has to be.
+        if session.vehicle then
+            if not DoesEntityExist(session.vehicle) then
+                exports['hc-core']:Notify(src, 'Your work vehicle is gone — no pay for this run.', 'error')
+                clearSession(src)
+                TriggerClientEvent('hc-jobs:client:forceStop', src)
+                return
+            end
+            if #(GetEntityCoords(session.vehicle) - depot) > Config.DepotDistance then
+                reject(src, 'run-vehicleaway', 'Park the work vehicle at the depot.')
+                return
+            end
+        end
     end
 
     local minSeconds = math.max(15, #session.stops * math.floor(Config.ProgressMs / 1000))
@@ -209,10 +273,17 @@ RegisterNetEvent('hc-jobs:server:completeRun', function(jobId)
     exports['hc-core']:LogMoney(src, 'hc-job-' .. job.id, pay, ('%s stops'):format(#session.stops))
     exports['hc-core']:Notify(src, ('You earned $%s from %s'):format(pay, job.label), 'success')
     clearSession(src)
+    TriggerClientEvent('hc-jobs:client:runComplete', src, job.id)
 end)
 
 AddEventHandler('playerDropped', function()
+    removeWorkVehicle(sessions[source], nil) -- keys die with the session
     sessions[source] = nil
+end)
+
+AddEventHandler('onResourceStop', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    for src, session in pairs(sessions) do removeWorkVehicle(session, src) end
 end)
 
 QBCore.Commands.Add('canceljob', 'Cancel your Heartless civilian job', {}, false, function(source)

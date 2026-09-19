@@ -90,7 +90,11 @@ car will be granted and then fail to spawn.
 2. `ensure` its resource in `server.cfg`.
 3. Add the entry to `Config.ExclusiveLot.vehicles`.
 4. Create the Tebex package with the command above.
-5. `restart hc-dealership`, then test with the staff command below.
+5. If it is not a car, set `type = 'bike'` (or boat / heli / plane) on the
+   entry — the server spawns vehicles and needs to be told what kind.
+6. `restart hc-dealership`, then from the server console:
+   `hc_dealer_spawntest <model>` — spawns it server-side, reports, deletes it.
+7. Test the purchase with the staff command below.
 
 ---
 

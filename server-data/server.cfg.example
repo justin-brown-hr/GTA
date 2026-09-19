@@ -29,14 +29,21 @@ set onesync_population true
 # No script hook / trainers on a serious RP city.
 sv_scriptHookAllowed 0
 
-# Entity lockdown. 'relaxed' blocks the worst client-side entity spam while
-# still allowing our client-side spawns (job vehicles, dealership deliveries,
-# Deadzone peds) to work.
+# Entity lockdown — decides whether CLIENTS may create networked entities.
+#   inactive  clients may create anything (FiveM default)
+#   relaxed   client SCRIPT-created entities are blocked; ambient population still works
+#   strict    clients may create nothing at all
+# Both relaxed and strict block every client-side CreateVehicle/CreateObject(..., true).
 #
-# Do NOT set this to "strict" until vehicle and ped creation has been moved to
-# the server natives — strict blocks ALL client-created entities and will break
-# hc-jobs, hc-dealership and hc-zombie on the spot. Test on staging first.
-sv_entityLockdown "relaxed"
+# All hc-* resources now create their networked entities on the server, so they
+# are lockdown-ready. The QB stack is NOT: qb-core's /car and client SpawnVehicle,
+# qb-fuel's nozzle, qb-policejob's cones/spikes, qb-radialmenu's stretcher,
+# qb-shops' delivery boxes and qb-vehiclekeys' key-fob prop all spawn networked
+# entities client-side and would silently break (audit: docs/security-hardening.md).
+# Leave this commented until those are replaced or patched, then test on staging.
+# sv_entityLockdown "relaxed"
+#
+# The Deadzone already runs its own instance in strict mode (hc-zombie).
 
 # Stop clients from taking control of entities they do not own (vehicle theft
 # by menu, yeeting other players' cars).

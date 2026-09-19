@@ -25,6 +25,7 @@ server_scripts {
 
 dependencies {
     'qb-core',
+    'qb-vehiclekeys',
     'oxmysql',
     'ox_lib',
     'hc-core',

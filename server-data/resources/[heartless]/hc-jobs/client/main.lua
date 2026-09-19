@@ -36,16 +36,15 @@ local function setWaypoint(coords, text)
     SetNewWaypoint(coords.x, coords.y)
 end
 
-local function deleteJobVehicle()
-    if active.vehicle and DoesEntityExist(active.vehicle) then
-        DeleteEntity(active.vehicle)
-    end
+-- The work vehicle belongs to the server: it spawns it, checks it is back at
+-- the depot, and deletes it. The client only keeps a handle to it.
+local function forgetJobVehicle()
     active.vehicle = nil
 end
 
 local function resetActive()
     clearBlip()
-    deleteJobVehicle()
+    forgetJobVehicle()
     active.jobId = nil
     active.label = nil
     active.stopIndex = 0
@@ -66,19 +65,47 @@ local function getJobDef(id)
     end
 end
 
-local function spawnJobVehicle(job)
-    if not job.vehicle then return true end
+--- Server-set plates are applied by whichever client owns the vehicle, so make
+--- sure it stuck once we are driving it — keys are matched by plate.
+local function ensurePlate(veh, plate)
+    if not plate then return end
+    for _ = 1, 40 do -- up to ~2s for ownership to pass to us after the warp
+        if NetworkGetEntityOwner(veh) == PlayerId() then break end
+        Wait(50)
+    end
+    local current = (GetVehicleNumberPlateText(veh) or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if current ~= plate and NetworkGetEntityOwner(veh) == PlayerId() then
+        SetVehicleNumberPlateText(veh, plate)
+    end
+end
+
+--- Get into the vehicle the server created at the depot. A networked entity
+--- only exists on clients within range of it, so go there first.
+local function enterWorkVehicle(job, netId, plate)
+    if not netId then return end
     local d = job.depot
-    lib.requestModel(job.vehicle)
-    local veh = CreateVehicle(joaat(job.vehicle), d.x, d.y, d.z, d.w, true, false)
-    SetVehicleOnGroundProperly(veh)
-    SetVehicleNumberPlateText(veh, 'HCJOB')
-    SetEntityAsMissionEntity(veh, true, true)
-    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
-    SetModelAsNoLongerNeeded(job.vehicle)
-    active.vehicle = veh
-    TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
-    return true
+    local ped = PlayerPedId()
+    if #(GetEntityCoords(ped) - vec3(d.x, d.y, d.z)) > 150.0 then
+        DoScreenFadeOut(300)
+        while not IsScreenFadedOut() do Wait(10) end
+        SetEntityCoords(ped, d.x + 3.0, d.y, d.z, false, false, false, false)
+    end
+    local veh
+    for _ = 1, 100 do -- up to ~5s to stream in
+        if NetworkDoesNetworkIdExist(netId) then
+            veh = NetToVeh(netId)
+            if veh ~= 0 and DoesEntityExist(veh) then break end
+        end
+        Wait(50)
+    end
+    if veh and veh ~= 0 then
+        TaskWarpPedIntoVehicle(ped, veh, -1)
+        active.vehicle = veh
+        ensurePlate(veh, plate)
+    else
+        lib.notify({ title = 'Jobs', description = 'Your work vehicle is at the depot.', type = 'inform' })
+    end
+    if IsScreenFadedOut() then DoScreenFadeIn(500) end
 end
 
 local function doProgress(label)
@@ -127,8 +154,8 @@ local function advanceOrFinish(job, confirmed, total)
         return
     end
 
+    -- The server resets us via hc-jobs:client:runComplete once it has paid.
     TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-    resetActive()
 end
 
 local function tryCompleteCurrentStop()
@@ -183,8 +210,8 @@ local function trySellOrReturn()
             return
         end
         if doProgress('Turning in...') then
+            -- Stay on the job until the server confirms (hc-jobs:client:runComplete).
             TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-            resetActive()
         end
         return
     end
@@ -195,9 +222,14 @@ local function trySellOrReturn()
             lib.notify({ title = 'Jobs', description = 'Return to the depot.', type = 'error' })
             return
         end
-        deleteJobVehicle()
+        if active.vehicle and DoesEntityExist(active.vehicle)
+            and #(GetEntityCoords(active.vehicle) - depot) > Config.DepotDistance then
+            lib.notify({ title = 'Jobs', description = 'Bring the work vehicle back to the depot.', type = 'error' })
+            return
+        end
+        -- Stay on the job until the server confirms (hc-jobs:client:runComplete);
+        -- if it refuses, the player can fix the problem and try again.
         TriggerServerEvent('hc-jobs:server:completeRun', job.id)
-        resetActive()
     end
 end
 
@@ -228,7 +260,7 @@ local function openJobCenter()
     lib.showContext('hc_job_center')
 end
 
-RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label, stopIndices)
+RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label, stopIndices, vehicleNetId, vehiclePlate)
     local job = getJobDef(jobId)
     if not job or type(stopIndices) ~= 'table' or #stopIndices == 0 then return end
 
@@ -239,7 +271,7 @@ RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label, stopIndices
     active.stopIndex = 1
     active.phase = 'stops'
 
-    spawnJobVehicle(job)
+    enterWorkVehicle(job, vehicleNetId, vehiclePlate)
     local first = currentStopCoords(job)
     if not first then return end
     setWaypoint(first, ('%s stop 1/%s'):format(label, #stopIndices))
@@ -249,6 +281,11 @@ RegisterNetEvent('hc-jobs:client:jobStarted', function(jobId, label, stopIndices
         type = 'success',
         duration = 8000,
     })
+end)
+
+--- The server paid out: the run is over.
+RegisterNetEvent('hc-jobs:client:runComplete', function(jobId)
+    if active.jobId == jobId then resetActive() end
 end)
 
 --- The server refused the stop — let the player work it again.

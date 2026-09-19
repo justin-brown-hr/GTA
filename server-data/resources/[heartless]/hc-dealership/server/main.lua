@@ -68,6 +68,11 @@ RegisterNetEvent('hc-dealership:server:buyPublic', function(model)
     end
 
     exports['hc-core']:LogMoney(src, 'hc-dealer-public', -veh.price, ('%s (%s)'):format(model, plate))
-    TriggerClientEvent('hc-dealership:client:spawnPurchased', src, model, plate, false)
-    exports['hc-core']:Notify(src, ('Purchased %s'):format(veh.label), 'success')
+    local netId = HCSpawnOwnedVehicle(src, model, veh.type, Config.PublicSpawn, plate)
+    if netId then
+        TriggerClientEvent('hc-dealership:client:vehicleReady', src, netId, plate)
+        exports['hc-core']:Notify(src, ('Purchased %s'):format(veh.label), 'success')
+    else
+        exports['hc-core']:Notify(src, ('Purchased %s — it is waiting in your garage.'):format(veh.label), 'success')
+    end
 end)

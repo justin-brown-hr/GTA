@@ -93,13 +93,33 @@ CreateThread(function()
     })
 end)
 
-RegisterNetEvent('hc-dealership:client:spawnPurchased', function(model, plate, exclusive)
-    local spawn = exclusive and Config.ExclusiveSpawn or Config.PublicSpawn
-    lib.requestModel(model)
-    local veh = CreateVehicle(joaat(model), spawn.x, spawn.y, spawn.z, spawn.w, true, false)
-    SetVehicleNumberPlateText(veh, plate)
-    SetVehicleOnGroundProperly(veh)
-    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
-    SetModelAsNoLongerNeeded(model)
-    TriggerEvent('vehiclekeys:client:SetOwner', plate)
+--- Server-set plates are applied by whichever client owns the vehicle, so make
+--- sure it stuck once we are driving it — keys are matched by plate.
+local function ensurePlate(veh, plate)
+    if not plate then return end
+    for _ = 1, 40 do -- up to ~2s for ownership to pass to us after the warp
+        if NetworkGetEntityOwner(veh) == PlayerId() then break end
+        Wait(50)
+    end
+    local current = (GetVehicleNumberPlateText(veh) or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if current ~= plate and NetworkGetEntityOwner(veh) == PlayerId() then
+        SetVehicleNumberPlateText(veh, plate)
+    end
+end
+
+--- The server created the car (and gave the keys); get the buyer into it once
+--- it has streamed in on this client.
+RegisterNetEvent('hc-dealership:client:vehicleReady', function(netId, plate)
+    for _ = 1, 100 do -- up to ~5s
+        if NetworkDoesNetworkIdExist(netId) then
+            local veh = NetToVeh(netId)
+            if veh ~= 0 and DoesEntityExist(veh) then
+                TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
+                ensurePlate(veh, plate)
+                return
+            end
+        end
+        Wait(50)
+    end
+    lib.notify({ title = 'Dealership', description = 'Your new car is on the lot.', type = 'inform' })
 end)

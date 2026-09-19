@@ -131,8 +131,9 @@ local function deliverGrant(row, Player)
     -- the garage. Spawning a car under someone mid-scene is worse than a notify.
     local ped = GetPlayerPed(src)
     local atLot = ped and ped ~= 0 and #(GetEntityCoords(ped) - Config.ExclusiveLot.coords) <= Config.LotDistance
-    if atLot then
-        TriggerClientEvent('hc-dealership:client:spawnPurchased', src, row.model, plate, true)
+    local netId = atLot and HCSpawnOwnedVehicle(src, row.model, exclusive and exclusive.type, Config.ExclusiveSpawn, plate)
+    if netId then
+        TriggerClientEvent('hc-dealership:client:vehicleReady', src, netId, plate)
         exports['hc-core']:Notify(src, ('Exclusive delivered: %s'):format(label), 'success', 10000)
     else
         exports['hc-core']:Notify(src, ('Exclusive delivered: %s — parked in your garage (plate %s).'):format(label, plate), 'success', 12000)

@@ -131,6 +131,27 @@ Continue from: [pick one]
 
 Replace the last line with whatever you need next.
 
+## 2026-09-19 Vehicles spawned server-side + garage-state bug fixed
+
+- `hc-jobs` and `hc-dealership` no longer create vehicles on the client. The
+  server spawns them (`CreateVehicleServerSetter`), sets the plate, keeps them
+  from being orphan-deleted, and grants keys via `qb-vehiclekeys` `GiveKeys`.
+- Jobs: the server now checks the **vehicle** (not just the player) is back at
+  the depot before paying, and deletes it on payout / cancel / disconnect /
+  resource stop. The client no longer resets its job state before the server
+  answers, so a refused turn-in can be retried instead of soft-locking.
+- **Bug fixed (my earlier Tebex code):** cars were written to
+  `player_vehicles` as `state = 0` (OUT). A car delivered while the buyer was
+  offline would be un-retrievable, and qb-garages adds a $500 depot fee to every
+  OUT car on restart. Now written GARAGED and flipped to OUT only once it has
+  actually spawned. No customer was affected (0 grants, 0 HC plates out).
+- Verified server-side with `hc_dealer_spawntest` (car, bike, boat, 2 exclusives):
+  spawn + delete OK. Plate and net id could not be confirmed with 0 players
+  (both are resolved by the owning client), so the client re-applies the plate
+  after the warp if it did not stick.
+- **Entity lockdown for the main world stays off**: six QB resources spawn
+  networked entities client-side. Full audit in `docs/security-hardening.md`.
+
 ## 2026-09-19 Deadzone rewritten + deployed
 
 - **Moved to the right island.** Config pointed at Cayo Perico (4840,-5174),

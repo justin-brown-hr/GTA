@@ -38,6 +38,9 @@ Use this with the client after M1 sign-off.
 ## Dealership (`hc-dealership`)
 
 - [ ] Public lot: in-game bank only, vanilla cars
+- [ ] Bought car appears on the lot with you in it, you have keys, plate is `HC######`
+- [ ] Sanchez / Faggio spawn as bikes and the Seashark as a boat (server needs the type)
+- [ ] A car delivered while you were away shows **Garaged** (not Out) in the garage
 - [ ] Exclusive lot: browse only, shows USD price + store link
 - [ ] Exclusive models cannot be bought with cash
 - [ ] Client car packs ensured from `[assets]`: `CyberTruckV`, `cometmans`,

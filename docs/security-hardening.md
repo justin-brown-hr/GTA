@@ -152,10 +152,34 @@ Each one used to pay out or succeed. All of them must now fail.
 
 ## Still open (not P0, do not skip)
 
-- **`sv_entityLockdown "strict"`** needs vehicle and ped creation moved to the
-  server natives first. `hc-jobs`, `hc-dealership` and `hc-zombie` create
-  entities client side today; strict blocks all of it. This is the single
-  biggest remaining anti-cheat win.
+- **Entity lockdown — our side is done, QB's is not.** Correction to an
+  earlier note: `relaxed` is not a safe halfway house — it already blocks every
+  client script-created entity; only ambient population survives it.
+
+  Audit of every resource on the server (2026-09-19), networked entities
+  created on the client:
+
+  | Resource | What | Status |
+  |---|---|---|
+  | hc-jobs | work vehicles | **moved to server** |
+  | hc-dealership | purchased / Tebex cars | **moved to server** |
+  | hc-zombie | zombies | **server**, own instance in `strict` |
+  | qb-core | `/car`, client `SpawnVehicle`, `AttachProp` | client |
+  | qb-fuel | pump nozzle | client |
+  | qb-policejob | cones, barriers, spikes | client |
+  | qb-radialmenu | stretcher bag | client |
+  | qb-shops | delivery box | client |
+  | qb-vehiclekeys | key-fob prop | client |
+
+  Local-only (non-networked) creation — unaffected by lockdown — was also
+  found in bob74_ipl, ox_lib, ox_inventory, qb-interior, qb-multicharacter,
+  qb-shops' ped and hc-drugs' dealer; those are fine.
+
+  Turning lockdown on today would break the QB rows. Options: patch those
+  six resources to server-side creation (vendor forks — re-apply on every QB
+  update), replace them with ox/community versions that are already
+  server-side, or rely on a proper anticheat instead. Until then it stays off
+  for the main world.
 - **A real anticheat** on top of this (the guards here stop *our* scripts being
   abused, not menu users spawning cars or god mode).
 - **`player_vehicles.plate` unique index** — the migration has the statement,
