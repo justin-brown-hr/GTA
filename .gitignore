@@ -1,5 +1,11 @@
 # Secrets / local runtime
 server-data/server.cfg
+# Backups/copies of the live config carry the same secrets (license key, DB
+# password) — ignore every variant except the committed example.
+server-data/server.cfg.*
+!server-data/server.cfg.example
+# FXServer console command history
+server-data/.replxx_history
 **/credentials*
 secrets/
 **/.env
