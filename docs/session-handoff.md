@@ -214,7 +214,7 @@ Read the real spawn names out of all 75 packs, including the ones sealed in
 
 Three things the client needs to be told:
 
-1. **Only 4 of 26 vehicle packs are FiveM-ready.** The other 22 are singleplayer
+1. **Only 4 of 29 vehicle packs are FiveM-ready.** The other 25 are singleplayer
    add-ons that need converting to resources first (~2 days of work, not covered
    by the current milestones). Spawn names for all of them are now confirmed.
 2. **The old unpack script could not read RAR5**, which is why exactly the three

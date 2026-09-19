@@ -70,14 +70,14 @@ Pick that face in the character creator to get the skin.
 
 ### 1. Most of the vehicle packs are not FiveM resources
 
-Of 26 vehicle packs, **4 are FiveM-ready**. The other 22 are singleplayer
+Of 29 vehicle packs, **4 are FiveM-ready**. The other 25 are singleplayer
 add-ons: a `dlc.rpf` (or an OpenIV `.oiv` installer) meant to be dropped into a
 GTA V install with OpenIV. FiveM cannot stream those as-is.
 
 Each one has to be unpacked and rebuilt as a resource — `stream/` folder plus a
 `fxmanifest.lua` with `data_file 'VEHICLE_METADATA_FILE'` entries — before it
 can go on the server. That is roughly 20–40 minutes per car with the right
-tooling, i.e. **around two days of work for the 22**, and it is not scripting
+tooling, i.e. **around two days of work for the 25**, and it is not scripting
 work that the current milestones cover.
 
 ### 2. The unpack script cannot read most of these archives
@@ -239,7 +239,7 @@ that was `unar` failing on them. All four test clean with `unrar`.
 
 ## What to do next
 
-1. **Decide with the client which cars are worth converting.** 22 conversions is
+1. **Decide with the client which cars are worth converting.** 25 conversions is
    real work; the exclusive lot does not need all of them on day one.
 2. **Pick one skin per vanilla weapon slot** from the collision table. The rest
    either get converted to addon weapons or stay unused.
